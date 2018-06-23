@@ -24,5 +24,8 @@ class OmnipayExtension extends Extension
 
         $loader = new Loader\YamlFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
         $loader->load('services.yml');
+
+        $definition = $container->getDefinition('omnipay');
+        $definition->addArgument($config);
     }
 }

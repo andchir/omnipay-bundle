@@ -1,0 +1,3 @@
+omnipay_start:
+    path: /omnipay_start/{id}
+    defaults: { _controller: OmnipayBundle:Default:index }

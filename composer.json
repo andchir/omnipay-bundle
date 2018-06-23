@@ -1,0 +1,23 @@
+{
+    "name": "andrew/omnipay-bundle",
+    "description": "Omnipay bundle for Symfony 3.x",
+    "keywords": ["symfony", "bundle", "omnipay", "payment", "shopkeeper"],
+    "license": "MIT",
+    "homepage": "http://modx-shopkeeper.ru/",
+    "authors": [
+        {
+            "name": "andchir",
+            "email": "andchir@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Andchir\\OmnipayBundle\\": ""
+        }
+    },
+    "require": {
+        "php": ">=5.3.0",
+        "league/omnipay": "^3",
+        "omnipay/paypal": "^3.0"
+    }
+}
