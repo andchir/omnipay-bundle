@@ -1,3 +1,17 @@
 omnipay_start:
     path: /omnipay_start/{id}
     defaults: { _controller: OmnipayBundle:Default:index }
+
+omnipay_notify:
+    path: /omnipay_notify
+    defaults: { _controller: OmnipayBundle:Default:notify }
+
+omnipay_return:
+    path: /omnipay_return
+    defaults: { _controller: OmnipayBundle:Default:return }
+
+omnipay_cancel:
+    path: /omnipay_cancel
+    defaults: { _controller: OmnipayBundle:Default:cancel }
+
+

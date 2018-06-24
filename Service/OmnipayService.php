@@ -5,6 +5,7 @@ namespace Andchir\OmnipayBundle\Service;
 use Omnipay\Common\GatewayInterface;
 use Omnipay\Omnipay as OmnipayCore;
 use Omnipay\Omnipay;
+use Psr\Log\LoggerInterface;
 
 class OmnipayService
 {
@@ -12,10 +13,13 @@ class OmnipayService
     protected $gateway;
     /** @var array */
     protected $config;
+    /** @var LoggerInterface */
+    private $logger;
 
-    public function __construct(array $config = [])
+    public function __construct(LoggerInterface $logger, array $config = [])
     {
         $this->config = $config;
+        $this->logger = $logger;
     }
 
     /**
@@ -78,6 +82,17 @@ class OmnipayService
     }
 
     /**
+     * @param $type
+     * @return mixed|string
+     */
+    public function getConfigUrl($type)
+    {
+        return isset($this->config[$type.'_url'])
+            ? $this->config[$type.'_url']
+            : '';
+    }
+
+    /**
      * @param $optionName
      * @return string
      */
@@ -126,6 +141,15 @@ class OmnipayService
             $purchase->setNotifyUrl($this->getConfigOption('notifyUrl'));
         }
         return $purchase;
+    }
+
+    /**
+     * @param $message
+     * @param $source
+     */
+    public function logInfo($message, $source)
+    {
+        $this->logger->info($message, ['omnipay' => $source]);
     }
 
     /**

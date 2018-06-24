@@ -22,6 +22,8 @@ class Configuration implements ConfigurationInterface
 
         $rootNode
             ->children()
+                ->scalarNode('success_url')->end()
+                ->scalarNode('fail_url')->end()
                 ->arrayNode('gateways')
                     ->useAttributeAsKey('name')
                     ->prototype('variable')
