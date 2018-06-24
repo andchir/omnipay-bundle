@@ -3,8 +3,11 @@
 namespace Andchir\OmnipayBundle\Controller;
 
 use Andchir\OmnipayBundle\Service\OmnipayService;
+use AppBundle\Controller\Admin\OrderController;
 use AppBundle\Document\Payment;
+use AppBundle\Document\Setting;
 use AppBundle\Document\User;
+use AppBundle\Service\SettingsService;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
@@ -80,6 +83,7 @@ class DefaultController extends Controller
         $paymentData = [
             'transactionId' => $payment->getId(),
             'email' => $user->getEmail(),
+            'userId' => $user->getId(),
             'amount' => $purchase->getAmount(),
             'currency' => $purchase->getCurrency(),
             'gatewayName' => $gatewayName
@@ -114,6 +118,9 @@ class DefaultController extends Controller
         $paymentId = !empty($paymentData['transactionId'])
             ? $paymentData['transactionId']
             : 0;
+        $paymentUserId = !empty($paymentData['userId'])
+            ? $paymentData['userId']
+            : 0;
         $gatewayName = !empty($paymentData['gatewayName'])
             ? $paymentData['gatewayName']
             : 0;
@@ -134,6 +141,16 @@ class DefaultController extends Controller
         );
 
         $omnipay->logInfo(json_encode($orderData), 'notify');
+
+        /** @var Payment $payment */
+        $payment = $this->getPayment($paymentId, $paymentUserId);
+        if (!$payment || !$this->getOrder($payment)) {
+            $omnipay->logInfo(
+                "Order for payment ID {$paymentId} not found. ". json_encode($paymentData),
+                'notify'
+            );
+            return new Response('');
+        }
 
         $response = $omnipay->getGateway()->completePurchase($orderData)->send();
         $responseData = $response->getData();
@@ -182,23 +199,23 @@ class DefaultController extends Controller
             'currency' => $paymentData['currency']
         );
 
+        /** @var Payment $payment */
+        $payment = $this->getPayment($paymentId, $user->getId());
+        if (!$payment || !$this->getOrder($payment)) {
+            $omnipay->logInfo(
+                "Order for payment ID {$paymentId} not found. ". json_encode($paymentData),
+                'return'
+            );
+            return $this->redirect($siteUrl . $omnipay->getConfigUrl('fail'));
+        }
+
         $response = $omnipay->getGateway()->completePurchase($orderData)->send();
         $responseData = $response->getData();
 
         if ($response->isSuccessful()){
 
-            /** @var Payment $payment */
-            $payment = $this->getRepository()->findOneBy([
-                'id' => $paymentId,
-                'userId' => $user->getId(),
-                'status' => Payment::STATUS_CREATED
-            ]);
-            if (!$payment) {
-                return $this->redirect($siteUrl . $omnipay->getConfigUrl('fail'));
-            }
-
-            $this->setOrderPaid($payment);
             $this->paymentUpdateStatus($paymentId, Payment::STATUS_SUCCESS);
+            $this->setOrderPaid($payment);
 
             return $this->redirect($siteUrl . $omnipay->getConfigUrl('success'));
 
@@ -252,21 +269,47 @@ class DefaultController extends Controller
     }
 
     /**
+     * Update order status in Shopkeeper app
+     * Update order status
      * @param Payment $payment
      * @return bool
      */
     public function setOrderPaid(Payment $payment)
     {
-        /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
-        $dm = $this->get('doctrine_mongodb')->getManager();
-        /** @var Order $order */
-        $order = $this->getOrder($payment);
-        if ($order) {
-            $order->setIsPaid(true);
-            $dm->flush();
-            return true;
+        $paymentStatusAfterNumber = (int) $this->getParameter('payment_status_after_number');
+        /** @var SettingsService $settingsService */
+        $settingsService = $this->container->get('app.settings');
+        /** @var Setting $statusSetting */
+        $statusSetting = $settingsService->getOrderStatusByNumber($paymentStatusAfterNumber);
+        if (!$statusSetting) {
+            return false;
         }
-        return false;
+        $orderController = new OrderController();
+        $orderController->setContainer($this->container);
+        return $orderController->updateItemProperty(
+            $payment->getOrderId(),
+            'status',
+            $statusSetting->getName()
+        );
+    }
+
+    /**
+     * Get payment object
+     * @param $paymentId
+     * @param $userId
+     * @param null $statusName
+     * @return object
+     */
+    public function getPayment($paymentId, $userId, $statusName = null)
+    {
+        if (!$statusName) {
+            $statusName = Payment::STATUS_CREATED;
+        }
+        return $this->getRepository()->findOneBy([
+            'id' => $paymentId,
+            'userId' => $userId,
+            'status' => $statusName
+        ]);
     }
 
     /**
@@ -293,10 +336,7 @@ class DefaultController extends Controller
         $dm = $this->get('doctrine_mongodb')->getManager();
 
         /** @var Payment $payment */
-        $payment = $this->getRepository()->findOneBy([
-            'id' => $paymentId,
-            'userId' => $user->getId()
-        ]);
+        $payment = $this->getPayment($paymentId, $user->getId());
         if (!$payment) {
             return;
         }
