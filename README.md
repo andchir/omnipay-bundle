@@ -1,8 +1,5 @@
 # omnipay-bundle
 
-Configuration
--------------
-
 Install:
 ~~~
 composer require andchir/omnipay-bundle
