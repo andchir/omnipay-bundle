@@ -1,5 +1,5 @@
 {
-    "name": "andrew/omnipay-bundle",
+    "name": "andchir/omnipay-bundle",
     "description": "Omnipay bundle for Symfony 3.x",
     "keywords": ["symfony", "bundle", "omnipay", "payment", "shopkeeper"],
     "license": "MIT",
