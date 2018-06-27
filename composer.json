@@ -19,6 +19,5 @@
         "php": ">=5.3.0",
         "league/omnipay": "^3",
         "omnipay/paypal": "^3.0"
-    },
-    "minimum-stability": "dev"
+    }
 }
