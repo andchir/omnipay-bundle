@@ -3,6 +3,12 @@
 Configuration
 -------------
 
+Install:
+~~~
+composer require andchir/omnipay-bundle
+~~~
+
+Configuration:
 ~~~
 omnipay:
     success_url: "/profile/history_orders"
@@ -15,7 +21,7 @@ omnipay:
             testMode: false
 ~~~
 
-Example:
+Example of use:
 ~~~
 /** @var OmnipayService $omnipay */
 $omnipay = $this->get('omnipay');
