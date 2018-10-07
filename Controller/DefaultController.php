@@ -3,6 +3,7 @@
 namespace Andchir\OmnipayBundle\Controller;
 
 use Omnipay\Common\Message\AbstractResponse;
+use Omnipay\Common\Message\AbstractRequest;
 use Andchir\OmnipayBundle\Service\OmnipayService;
 use AppBundle\Controller\Admin\OrderController;
 use AppBundle\Document\Payment;
@@ -75,8 +76,8 @@ class DefaultController extends Controller
         //if ($omnipayService->getGatewaySupportsAuthorize()) {
         if ($gatewayName === 'Sberbank') {
 
-            /** @var AbstractResponse $response */
-            $response = $omnipayService->getGateway()->authorize(
+            /** @var AbstractRequest $authRequest */
+            $authRequest = $omnipayService->getGateway()->authorize(
                     [
                         'orderNumber' => $payment->getId(),
                         'amount' => $payment->getAmount() * 100, // The amount of payment in kopecks (or cents)
@@ -85,8 +86,10 @@ class DefaultController extends Controller
                     ]
                 )
                 ->setUserName(uniqid('', true))
-                ->setPassword(uniqid('', true))
-                ->send();
+                ->setPassword(uniqid('', true));
+
+            /** @var AbstractResponse $response */
+            $response = $authRequest->send();
 
             if (!$response->isSuccessful()) {
                 $output = $response->getMessage();
