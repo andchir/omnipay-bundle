@@ -19,6 +19,6 @@
         "league/omnipay": "^3",
         "omnipay/paypal": "^3.0",
         "andrewnovikof/omnipay-sberbank": "^3.1",
-        "andchir/omnipay3-yandexkassa": "1.0.2"
+        "andchir/omnipay3-yandexkassa": "1.0.4"
     }
 }
