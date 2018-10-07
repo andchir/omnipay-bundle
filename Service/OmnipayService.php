@@ -2,24 +2,29 @@
 
 namespace Andchir\OmnipayBundle\Service;
 
-use Omnipay\Common\GatewayInterface;
+use Symfony\Component\HttpFoundation\Session\Session;
+use AppBundle\Document\Payment;
+use Omnipay\Common\AbstractGateway;
 use Omnipay\Omnipay as OmnipayCore;
 use Omnipay\Omnipay;
 use Psr\Log\LoggerInterface;
 
 class OmnipayService
 {
-    /** @var GatewayInterface */
+    /** @var AbstractGateway */
     protected $gateway;
     /** @var array */
     protected $config;
     /** @var LoggerInterface */
     private $logger;
+    /** @var Session */
+    private $session;
 
-    public function __construct(LoggerInterface $logger, array $config = [])
+    public function __construct(LoggerInterface $logger, Session $session, array $config = [])
     {
         $this->config = $config;
         $this->logger = $logger;
+        $this->session = $session;
     }
 
     /**
@@ -32,12 +37,11 @@ class OmnipayService
             return false;
         }
         $this->gateway = Omnipay::create($gatewayName);
-        $this->setGatewayParameters();
         return true;
     }
 
     /**
-     * @return GatewayInterface
+     * @return AbstractGateway
      */
     public function getGateway()
     {
@@ -62,22 +66,26 @@ class OmnipayService
     }
 
     /**
-     * @param $optionName
-     * @param $optionValue
+     * @param string $optionName
+     * @param mixed $optionValue
+     * @param string $gatewayName
      */
-    public function setConfigOption($optionName, $optionValue)
+    public function setConfigOption($optionName, $optionValue, $gatewayName = '')
     {
-        $gatewayName = $this->gateway->getShortName();
+        if (!$gatewayName) {
+            $gatewayName = $this->gateway->getShortName();
+        }
         $this->config['gateways'][$gatewayName][$optionName] = $optionValue;
     }
 
     /**
      * @param $options
+     * @param string $gatewayName
      */
-    public function setConfigOptions($options)
+    public function setConfigOptions($options, $gatewayName = '')
     {
         foreach ($options as $optionName => $optionValue) {
-            $this->setConfigOption($optionName, $optionValue);
+            $this->setConfigOption($optionName, $optionValue, $gatewayName);
         }
     }
 
@@ -89,7 +97,7 @@ class OmnipayService
     {
         return isset($this->config[$type.'_url'])
             ? $this->config[$type.'_url']
-            : '';
+            : $this->config['fail_url'];
     }
 
     /**
@@ -110,6 +118,22 @@ class OmnipayService
     public function getGatewayParameters()
     {
         return $this->gateway->getParameters();
+    }
+
+    /**
+     * @return string
+     */
+    public function getGatewayName()
+    {
+        return $this->gateway->getName();
+    }
+
+    /**
+     * @return boolean
+     */
+    public function getGatewaySupportsAuthorize()
+    {
+        return $this->gateway->supportsAuthorize();
     }
 
     /**
@@ -141,6 +165,53 @@ class OmnipayService
             $purchase->setNotifyUrl($this->getConfigOption('notifyUrl'));
         }
         return $purchase;
+    }
+
+    /**
+     * @param Payment $payment
+     * @param $paymentDescription
+     * @return bool
+     */
+    public function sendPurchase(Payment $payment, $paymentDescription)
+    {
+        $this->setGatewayParameters();
+
+        $purchase = $this->createPurchase(
+            $payment->getId(),
+            $paymentDescription,
+            [
+                'amount' => OmnipayService::toDecimal($payment->getAmount()),
+                'currency' => $payment->getCurrency()
+            ]
+        );
+        $response = $purchase->send();
+
+        // Save data in session
+        $paymentData = [
+            'transactionId' => $payment->getId(),
+            'email' => $payment->getEmail(),
+            'userId' => $payment->getUserId(),
+            'amount' => $payment->getAmount(),
+            'currency' => $payment->getCurrency(),
+            'gatewayName' => $this->getGatewayName()
+        ];
+        $this->session->set('paymentData', $paymentData);
+
+        $this->logInfo(json_encode($paymentData) . " Order ID: {$payment->getUserId()}", 'start');
+
+        // Process response
+        if ($response->isSuccessful()) {
+
+            // Payment was successful
+            // print_r($response);
+
+        } elseif ($response->isRedirect()) {
+            $response->redirect();
+        } else {
+            // Payment failed
+            echo $response->getMessage();
+        }
+        return true;
     }
 
     /**

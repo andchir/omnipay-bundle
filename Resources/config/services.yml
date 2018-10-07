@@ -1,5 +1,5 @@
 services:
     omnipay:
         class: Andchir\OmnipayBundle\Service\OmnipayService
-        arguments: ['@logger']
+        arguments: ['@logger', '@session']
         public: true
