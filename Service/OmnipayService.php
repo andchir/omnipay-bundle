@@ -2,6 +2,8 @@
 
 namespace Andchir\OmnipayBundle\Service;
 
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session;
 use AppBundle\Document\Payment;
 use Omnipay\Common\AbstractGateway;
@@ -13,6 +15,8 @@ class OmnipayService
 {
     /** @var AbstractGateway */
     protected $gateway;
+    /** @var ContainerInterface */
+    private $container;
     /** @var array */
     protected $config;
     /** @var LoggerInterface */
@@ -20,8 +24,14 @@ class OmnipayService
     /** @var Session */
     private $session;
 
-    public function __construct(LoggerInterface $logger, Session $session, array $config = [])
+    public function __construct(
+        ContainerInterface $container,
+        LoggerInterface $logger,
+        Session $session,
+        array $config = []
+    )
     {
+        $this->container = $container;
         $this->config = $config;
         $this->logger = $logger;
         $this->session = $session;
@@ -49,14 +59,44 @@ class OmnipayService
     }
 
     /**
-     * Set gateway parameters
+     * @param Payment $payment
+     * @return array
      */
-    public function setGatewayParameters()
+    public function getGatewayConfigParameters(Payment $payment)
     {
+        $opts = [
+            'CUSTOMER_EMAIL' => $payment->getEmail(),
+            'PAYMENT_ID' => $payment->getId(),
+            'ORDER_ID' => $payment->getOrderId(),
+            'RETURN_URL' => $this->getConfigUrl('return'),
+            'CANCEL_URL' => $this->getConfigUrl('cancel'),
+            'SUCCESS_URL' => $this->getConfigUrl('success'),
+            'FAIL_URL' => $this->getConfigUrl('fail'),
+            'AMOUNT' => $this->toDecimal($payment->getAmount()),
+            'CURRENCY' => $payment->getCurrency(),
+            'CUSTOMER_IP_ADDR' => $this->getClientIp()
+        ];
+
         $gatewayName = $this->gateway->getShortName();
         $parameters = isset($this->config['gateways'][$gatewayName])
             ? $this->config['gateways'][$gatewayName]
             : [];
+
+        foreach($parameters as $paramName => &$value){
+            $value = str_replace(array_keys($opts), array_values($opts), $value);
+        }
+
+        return $parameters;
+    }
+
+    /**
+     * @param Payment $payment
+     * Set gateway parameters
+     */
+    public function setGatewayParameters(Payment $payment)
+    {
+        $parameters = $this->getGatewayConfigParameters($payment);
+
         foreach($parameters as $paramName => $value){
             $methodName = 'set' . $paramName;
             if (!empty($value) && method_exists($this->gateway, $methodName)) {//case-insensitive
@@ -95,9 +135,20 @@ class OmnipayService
      */
     public function getConfigUrl($type)
     {
+        $request = Request::createFromGlobals();
+        $host = $request->getSchemeAndHttpHost();
         return isset($this->config[$type.'_url'])
-            ? $this->config[$type.'_url']
-            : $this->config['fail_url'];
+            ? $host . $this->config[$type.'_url']
+            : $host . $this->config['fail_url'];
+    }
+
+    /**
+     * @return null|string
+     */
+    public function getClientIp()
+    {
+        $request = Request::createFromGlobals();
+        return $request->getClientIp();
     }
 
     /**
@@ -169,16 +220,15 @@ class OmnipayService
 
     /**
      * @param Payment $payment
-     * @param $paymentDescription
      * @return bool
      */
-    public function sendPurchase(Payment $payment, $paymentDescription)
+    public function sendPurchase(Payment $payment)
     {
-        $this->setGatewayParameters();
+        $this->setGatewayParameters($payment);
 
         $purchase = $this->createPurchase(
             $payment->getId(),
-            $paymentDescription,
+            $payment->getDescription(),
             [
                 'amount' => OmnipayService::toDecimal($payment->getAmount()),
                 'currency' => $payment->getCurrency()
@@ -210,6 +260,7 @@ class OmnipayService
         } else {
             // Payment failed
             echo $response->getMessage();
+            return false;
         }
         return true;
     }
@@ -228,7 +279,7 @@ class OmnipayService
      * @param $number
      * @return string
      */
-    public static function toDecimal( $number )
+    public static function toDecimal($number)
     {
         $number = number_format($number, 2, '.', '');
         return $number;
