@@ -271,7 +271,7 @@ class OmnipayService
      */
     public function logInfo($message, $source)
     {
-        $this->logger->info($message, ['omnipay' => $source]);
+        $this->logger->notice($message, ['omnipay' => $source]);
     }
 
     /**
