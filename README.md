@@ -19,16 +19,27 @@ omnipay:
     gateways:
         PayPal_Express:
             parameters:
-                username: xxxxx_api1.gmail.com
-                password: xxxxxxxxxxxxxxxx
-                signature: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+                username: xxxxxxxxxxxxx
+                password: xxxxxxxxxxxxxxxxxx
+                signature: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
             purchase:
+                username: ~
+                password: ~
+                signature: ~
                 amount: AMOUNT
                 currency: RUB
                 testMode: true
-                returnUrl: RETURN_URL
+                returnUrl: NOTIFY_URL
                 cancelUrl: CANCEL_URL
-            complete: []
+            complete:
+                username: ~
+                password: ~
+                signature: ~
+                amount: AMOUNT
+                currency: RUB
+                testMode: true
+                returnUrl: NOTIFY_URL
+                cancelUrl: CANCEL_URL
         YandexMoney:
             parameters:
                 shopid: xxxxxx
@@ -58,10 +69,21 @@ omnipay:
                 customerNumber: CUSTOMER_EMAIL
                 password: ~
         Sberbank:
-            purchase:
+            parameters:
                 username: xxxxxx
                 password: xxxxxx
+                returnUrl: RETURN_URL
+                cancelUrl: CANCEL_URL
+            purchase:
+                username: ~
+                password: ~
+                orderNumber: PAYMENT_ID
+                amount: AMOUNT
+                currency: RUB
                 testMode: true
+            complete:
+                username: ~
+                password: ~
 ~~~
 
 Example of use:
