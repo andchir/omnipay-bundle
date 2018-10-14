@@ -8,14 +8,60 @@ composer require andchir/omnipay-bundle
 Configuration:
 ~~~
 omnipay:
-    success_url: "/profile/history_orders"
-    fail_url: "/"
+    success_url: '/profile/history_orders'
+    fail_url: '/'
+    return_url: '/omnipay_return'
+    notify_url: '/omnipay_notify'
+    cancel_url: '/omnipay_cancel'
+    data_keys:
+        paymentId: ['orderNumber']
+        customerEmail: ['customerNumber']
     gateways:
         PayPal_Express:
-            username: xxxxx_api1.gmail.com
-            password: xxxxxxxxxx
-            signature: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-            testMode: false
+            parameters:
+                username: xxxxx_api1.gmail.com
+                password: xxxxxxxxxxxxxxxx
+                signature: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+            purchase:
+                amount: AMOUNT
+                currency: RUB
+                testMode: true
+                returnUrl: RETURN_URL
+                cancelUrl: CANCEL_URL
+            complete: []
+        YandexMoney:
+            parameters:
+                shopid: xxxxxx
+                scid: xxxxxx
+                password: xxxxxxxxxxxxxxxxx
+                customerNumber: CUSTOMER_EMAIL
+                amount: AMOUNT
+                orderId: PAYMENT_ID
+                method: ~
+                returnUrl: RETURN_URL
+                cancelUrl: CANCEL_URL
+            purchase:
+                amount: AMOUNT
+                currency: RUB
+                testMode: true
+            complete:
+                shopid: ~
+                scid: ~
+                action: ~
+                md5: ~
+                orderNumber: PAYMENT_ID
+                orderSumAmount: AMOUNT
+                orderSumCurrencyPaycash: ~
+                orderSumBankPaycash: ~
+                shopid: ~
+                invoiceId: ~
+                customerNumber: CUSTOMER_EMAIL
+                password: ~
+        Sberbank:
+            purchase:
+                username: xxxxxx
+                password: xxxxxx
+                testMode: true
 ~~~
 
 Example of use:
