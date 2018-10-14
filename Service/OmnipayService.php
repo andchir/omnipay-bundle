@@ -2,6 +2,7 @@
 
 namespace Andchir\OmnipayBundle\Service;
 
+use AppBundle\Repository\PaymentRepository;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session;
@@ -60,9 +61,10 @@ class OmnipayService
 
     /**
      * @param Payment $payment
+     * @param string $configKey
      * @return array
      */
-    public function getGatewayConfigParameters(Payment $payment)
+    public function getGatewayConfigParameters(Payment $payment, $configKey = 'gateways')
     {
         $opts = [
             'CUSTOMER_EMAIL' => $payment->getEmail(),
@@ -78,8 +80,8 @@ class OmnipayService
         ];
 
         $gatewayName = $this->gateway->getShortName();
-        $parameters = isset($this->config['gateways'][$gatewayName])
-            ? $this->config['gateways'][$gatewayName]
+        $parameters = isset($this->config[$configKey][$gatewayName])
+            ? $this->config[$configKey][$gatewayName]
             : [];
 
         foreach($parameters as $paramName => &$value){
@@ -96,6 +98,8 @@ class OmnipayService
     public function setGatewayParameters(Payment $payment)
     {
         $parameters = $this->getGatewayConfigParameters($payment);
+
+        $this->logInfo(json_encode($parameters), 'parameters');
 
         foreach($parameters as $paramName => $value){
             $methodName = 'set' . $paramName;
@@ -247,7 +251,7 @@ class OmnipayService
         ];
         $this->session->set('paymentData', $paymentData);
 
-        $this->logInfo(json_encode($paymentData) . " Order ID: {$payment->getUserId()}", 'start');
+        $this->logInfo(json_encode($paymentData) . " Order ID: {$payment->getId()}", 'start');
 
         // Process response
         if ($response->isSuccessful()) {
@@ -263,6 +267,62 @@ class OmnipayService
             return false;
         }
         return true;
+    }
+
+    public function getPaymentByRequest(Request $request)
+    {
+        $requestData = array_merge($request->query->all(), $request->request->all());
+        $paymentId = 0;
+        $customerEmail = '';
+        $gateways_complete_parameters = $this->config['gateways_complete'];
+        foreach ($gateways_complete_parameters as $parameters) {
+            // Search payment ID
+            $paymentIdKeys = array_filter($parameters, function($v){
+                return $v === 'PAYMENT_ID';
+            });
+            if (!empty($paymentIdKeys)) {
+                $keys = array_keys($paymentIdKeys);
+                $tmpArr = array_filter($requestData, function($v, $k) use ($keys) {
+                    return in_array($k, $keys) && !empty($v);
+                }, ARRAY_FILTER_USE_BOTH);
+                if (!empty($tmpArr)) {
+                    $tmpArr = array_values($tmpArr);
+                    $paymentId = (int) current($tmpArr);
+                    break;
+                }
+            }
+            // Search customer email
+            $emailKeys = array_filter($parameters, function($v){
+                return $v === 'CUSTOMER_EMAIL';
+            });
+            if (!empty($emailKeys)) {
+                $keys = array_keys($emailKeys);
+                $tmpArr = array_filter($requestData, function($v, $k) use ($keys) {
+                    return in_array($k, $keys) && !empty($v);
+                }, ARRAY_FILTER_USE_BOTH);
+                if (!empty($tmpArr)) {
+                    $tmpArr = array_values($tmpArr);
+                    $customerEmail = current($tmpArr);
+                    break;
+                }
+            }
+        }
+
+        /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
+        $dm = $this->container->get('doctrine_mongodb')->getManager();
+        /** @var PaymentRepository $paymentRepository */
+        $paymentRepository = $dm->getRepository(Payment::class);
+
+        if (!empty($paymentId)) {
+            $payments = $paymentRepository->findLastById($paymentId);
+            return !empty($payments) ? $payments->getSingleResult() : null;
+        }
+        if (!empty($customerEmail)) {
+            $payments = $paymentRepository->findLastByEmail($customerEmail);
+            return !empty($payments) ? $payments->getSingleResult() : null;
+        }
+
+        return null;
     }
 
     /**

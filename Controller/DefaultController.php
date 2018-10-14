@@ -42,10 +42,6 @@ class DefaultController extends Controller
             throw $this->createAccessDeniedException();
         }
         $gatewayName = $order->getPaymentValue();
-        $customerEmail = $request->get('email');
-        if (!$customerEmail && $user) {
-            $customerEmail = $user->getEmail();
-        }
 
         /** @var OmnipayService $omnipayService */
         $omnipayService = $this->get('omnipay');
@@ -61,23 +57,16 @@ class DefaultController extends Controller
         $payment = new Payment();
         $payment
             ->setUserId($userId)
-            ->setEmail($customerEmail)
+            ->setEmail($order->getEmail())
             ->setOrderId($order->getId())
             ->setCurrency($currency)
             ->setAmount($order->getPrice())
             ->setDescription($paymentDescription)
-            ->setStatus($payment::STATUS_CREATED);
+            ->setStatus($payment::STATUS_CREATED)
+            ->setOptions(['gatewayName' => $gatewayName]);
 
         $dm->persist($payment);
         $dm->flush();
-
-        // Create Omnipay purchase
-        $siteUrl = $request->getSchemeAndHttpHost() . $request->getBaseUrl();
-        $omnipayService->setConfigOptions([
-            'returnUrl' => sprintf('%s/omnipay_return', $siteUrl),
-            'cancelUrl' => sprintf('%s/omnipay_cancel', $siteUrl),
-            'notifyUrl' => sprintf('%s/omnipay_notify', $siteUrl)
-        ]);
 
         //if ($omnipayService->getGatewaySupportsAuthorize()) {
         if ($gatewayName === 'Sberbank') {
@@ -115,9 +104,62 @@ class DefaultController extends Controller
     }
 
     /**
+     * @Route("/omnipay_return", name="omnipay_return")
+     * @param Request $request
+     * @return Response
+     */
+    public function returnAction(Request $request)
+    {
+        /** @var OmnipayService $omnipayService */
+        $omnipayService = $this->get('omnipay');
+
+        /** @var Payment $payment */
+        $payment = $omnipayService->getPaymentByRequest($request);
+        if (!$payment || !$this->getOrder($payment)) {
+            $omnipayService->logInfo('Order not found. ', 'return');
+            $this->logRequestData($request, 0, 'return');
+            return new Response('');
+        }
+
+        $gatewayName = $payment->getOptionValue('gatewayName');
+        if (!$gatewayName || !$omnipayService->create($gatewayName)) {
+            $omnipayService->logInfo("Payment gateway ({$gatewayName}) not found.", 'return');
+            return new Response('');
+        };
+
+        $this->logRequestData($request, $payment->getId(), 'return');
+
+        $orderData = $omnipayService->getGatewayConfigParameters($payment, 'gateways_complete');
+
+        try {
+
+            $response = $omnipayService->getGateway()->completePurchase($orderData)->send();
+            $responseData = $response->getData();
+
+            if ($response->isSuccessful()){
+
+                $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_COMPLETED);
+                $this->setOrderPaid($payment);
+
+            } elseif ($response->isRedirect()) {
+                $omnipayService->logInfo('PAYMENT REDIRECT. '. json_encode($responseData), 'return');
+                $response->redirect();
+            } else {
+                $omnipayService->logInfo('PAYMENT FAIL. '. json_encode($responseData), 'return');
+                $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_ERROR);
+            }
+
+        } catch (\Exception $e) {
+            $omnipayService->logInfo('OMNIPAY ERROR: '. $e->getMessage(), 'return');
+        }
+
+        return new Response('');
+    }
+
+    /**
      * @Route("/omnipay_notify", name="omnipay_notify")
      * @param Request $request
-     * @return Response|NotFoundHttpException|AccessDeniedException
+     * @return Response
      */
     public function notifyAction(Request $request)
     {
@@ -136,7 +178,8 @@ class DefaultController extends Controller
         $omnipayService = $this->get('omnipay');
         if (!$gatewayName || !$omnipayService->create($gatewayName)) {
             $omnipayService->logInfo("Payment gateway ({$gatewayName}) not found.", 'return');
-            throw $this->createNotFoundException('Payment gateway not found.');
+            //throw $this->createNotFoundException('Payment gateway not found.');
+            return new Response('');
         };
 
         /** @var Payment $payment */
@@ -149,11 +192,9 @@ class DefaultController extends Controller
             return new Response('');
         }
 
-        $orderData = $omnipayService->getGatewayConfigParameters($payment);
-        $orderData['amount'] =  $paymentData['amount'];
-        $orderData['currency'] =  $paymentData['currency'];
+        $orderData = $omnipayService->getGatewayConfigParameters($payment, 'gateways_complete');
 
-        $omnipayService->logInfo(json_encode($orderData), 'notify');
+        $this->logRequestData($request, $paymentId, 'notify');
 
         $response = $omnipayService->getGateway()->completePurchase($orderData)->send();
         $responseData = $response->getData();
@@ -164,68 +205,6 @@ class DefaultController extends Controller
         else if (!$response->isSuccessful()){
             $omnipayService->logInfo('PAYMENT FAIL. '. json_encode($responseData), 'notify');
             $this->paymentUpdateStatus($paymentId, Payment::STATUS_ERROR);
-        }
-
-        return new Response('');
-    }
-
-    /**
-     * @Route("/omnipay_return", name="omnipay_return")
-     * @param Request $request
-     * @return Response|NotFoundHttpException|AccessDeniedException
-     */
-    public function returnAction(Request $request)
-    {
-        $paymentData = $request->getSession()->get('paymentData');
-        $paymentId = !empty($paymentData['transactionId'])
-            ? $paymentData['transactionId']
-            : 0;
-        $paymentUserId = !empty($paymentData['userId'])
-            ? $paymentData['userId']
-            : 0;
-
-        $gatewayName = !empty($paymentData['gatewayName'])
-            ? $paymentData['gatewayName']
-            : 0;
-
-        /** @var OmnipayService $omnipayService */
-        $omnipayService = $this->get('omnipay');
-        if (!$gatewayName || !$omnipayService->create($gatewayName)) {
-            $omnipayService->logInfo("Payment gateway ({$gatewayName}) not found.", 'return');
-            throw $this->createNotFoundException('Payment gateway not found.');
-        };
-
-        /** @var Payment $payment */
-        $payment = $this->getPayment($paymentId, $paymentUserId);
-        if (!$payment || !$this->getOrder($payment)) {
-            $omnipayService->logInfo(
-                "Order for payment ID {$paymentId} not found. ". json_encode($paymentData),
-                'return'
-            );
-            return $this->redirect($omnipayService->getConfigUrl('fail'));
-        }
-
-        $orderData = $omnipayService->getGatewayConfigParameters($payment);
-        $orderData['amount'] =  $paymentData['amount'];
-        $orderData['currency'] =  $paymentData['currency'];
-
-        $response = $omnipayService->getGateway()->completePurchase($orderData)->send();
-        $responseData = $response->getData();
-
-        if ($response->isSuccessful()){
-
-            $this->paymentUpdateStatus($paymentId, Payment::STATUS_SUCCESS);
-            $this->setOrderPaid($payment);
-
-            return $this->redirect($omnipayService->getConfigUrl('success'));
-
-        } elseif ($response->isRedirect()) {
-            $omnipayService->logInfo('PAYMENT REDIRECT. '. json_encode($responseData), 'return');
-            $response->redirect();
-        } else {
-            $omnipayService->logInfo('PAYMENT FAIL. '. json_encode($responseData), 'return');
-            $this->paymentUpdateStatus($paymentId, Payment::STATUS_ERROR);
-            return $this->redirect($omnipayService->getConfigUrl('fail'));
         }
 
         return new Response('');
@@ -260,7 +239,7 @@ class DefaultController extends Controller
             throw $this->createNotFoundException('Payment not found.');
         }
 
-        $omnipayService->logInfo("Payment ({$paymentId}) CANCELED.", 'cancel');
+        $this->logRequestData($request, $paymentId, 'cancel');
 
         if ($paymentId) {
             $this->paymentUpdateStatus($paymentId, Payment::STATUS_CANCELED);
@@ -343,6 +322,26 @@ class DefaultController extends Controller
         }
         $payment->setStatus($statusName);
         $dm->flush();
+    }
+
+    /**
+     * @param Request $request
+     * @param $paymentId
+     * @param string $source
+     */
+    public function logRequestData(Request $request, $paymentId = 0, $source = 'request')
+    {
+        /** @var OmnipayService $omnipayService */
+        $omnipayService = $this->get('omnipay');
+        $postData = $request->request->all() ?: [];
+        $getData = $request->query->all() ?: [];
+        $message = $paymentId
+            ? "Payment ({$paymentId}). REQUEST DATA: "
+            : 'REQUEST DATA: ';
+        $omnipayService->logInfo(
+            $message . json_encode(array_merge($postData, $getData)),
+            $source
+        );
     }
 
     /**

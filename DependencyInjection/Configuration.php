@@ -32,6 +32,11 @@ class Configuration implements ConfigurationInterface
                     ->prototype('variable')
                     ->end()
                 ->end()
+                ->arrayNode('gateways_complete')
+                    ->useAttributeAsKey('name')
+                    ->prototype('variable')
+                    ->end()
+                ->end()
             ->end()
         ;
 
