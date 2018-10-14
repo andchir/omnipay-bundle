@@ -20,17 +20,28 @@ omnipay:
 
 Example of use:
 ~~~
-/** @var OmnipayService $omnipay */
-$omnipay = $this->get('omnipay');
+/** @var OmnipayService $omnipayService */
+$omnipayService = $this->get('omnipay');
 
-$omnipay->create('PayPal_Express');
+$gatewayName = 'PayPal_Express';
+$omnipayService->create($gatewayName);
 
-$purchase = $omnipay->createPurchase(
-    $paymentId,// Your payment ID
-    $paymentDescription,// Your payment description
-    [
-        'amount' => OmnipayService::toDecimal($price),// Order price
-        'currency' => $currency// Your currency
-    ]
-);
+// Create payment
+$payment = new Payment();
+$payment
+    ->setUserId(0)
+    ->setEmail('aaa@bbb.cc')
+    ->setOrderId(1)
+    ->setCurrency('RUB')
+    ->setAmount(500)
+    ->setDescription('Order #12')
+    ->setStatus(Payment::STATUS_CREATED)
+    ->setOptions(['gatewayName' => $gatewayName]);
+
+$dm->persist($payment);
+$dm->flush();
+
+$omnipayService->initialize($payment);
+
+$omnipayService->sendPurchase($payment);
 ~~~

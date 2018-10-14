@@ -62,7 +62,7 @@ class DefaultController extends Controller
             ->setCurrency($currency)
             ->setAmount($order->getPrice())
             ->setDescription($paymentDescription)
-            ->setStatus($payment::STATUS_CREATED)
+            ->setStatus(Payment::STATUS_CREATED)
             ->setOptions(['gatewayName' => $gatewayName]);
 
         $dm->persist($payment);
