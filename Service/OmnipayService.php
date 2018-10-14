@@ -93,13 +93,28 @@ class OmnipayService
             ? $this->config['gateways'][$gatewayName][$configKey]
             : [];
 
+        $start_parameters = [];
+        if ($configKey !== 'parameters') {
+            $start_parameters = isset($this->config['gateways'][$gatewayName]['parameters'])
+                ? $this->config['gateways'][$gatewayName]['parameters']
+                : [];
+        }
+
         $request = Request::createFromGlobals();
         $postData = $request->request->all();
 
         foreach($parameters as $paramName => &$value){
-            $value = str_replace(array_keys($opts), array_values($opts), $value);
+            if (!is_null($value)) {
+                $value = str_replace(array_keys($opts), array_values($opts), $value);
+            }
+            if (is_null($value) && isset($start_parameters[$paramName])) {
+                $value = $start_parameters[$paramName];
+            }
             if (is_null($value) && isset($postData[$paramName])) {
                 $value = $postData[$paramName];
+            }
+            if (is_null($value)) {
+                $value = '';
             }
         }
 

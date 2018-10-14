@@ -135,21 +135,19 @@ class DefaultController extends Controller
 
         try {
 
-            $response = $omnipayService->getGateway()->completePurchase($orderData)->send();
+            $response = $omnipayService->getGateway()->authorize($orderData)->send();
             $responseData = $response->getData();
 
             if ($response->isSuccessful()){
-
-                return new Response($response->getMessage());
-
-            } elseif ($response->isRedirect()) {
-                $omnipayService->logInfo('PAYMENT REDIRECT. '. json_encode($responseData), 'return');
+                $omnipayService->logInfo('PAYMENT SUCCESS. ' . $response->getMessage(), 'return');
+                return $this->createResponse($response->getMessage());
+            } else if ($response->isRedirect()) {
+                $omnipayService->logInfo('PAYMENT REDIRECT. ' . json_encode($responseData), 'return');
                 $response->redirect();
             } else {
-                $omnipayService->logInfo('PAYMENT FAIL. '. json_encode($responseData), 'return');
-                $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_ERROR);
-
-                return new Response($response->getMessage());
+                $omnipayService->logInfo("PAYMENT FAIL. MESSAGE: {$response->getMessage()}" . json_encode($responseData), 'return');
+                $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), Payment::STATUS_ERROR);
+                return $this->createResponse($response->getMessage());
             }
 
         } catch (\Exception $e) {
@@ -192,24 +190,22 @@ class DefaultController extends Controller
             $response = $omnipayService->getGateway()->completePurchase($orderData)->send();
             $responseData = $response->getData();
 
-            if (!$response->isSuccessful()){
-                $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_COMPLETED);
+            if ($response->isSuccessful()){
+                $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), Payment::STATUS_COMPLETED);
                 $this->setOrderPaid($payment);
-
-                return new Response($response->getMessage());
+                return $this->createResponse($response->getMessage());
             }
             if ($response->isRedirect()) {
                 $response->redirect();
             }
             if (!$response->isSuccessful()){
-                $omnipayService->logInfo('PAYMENT FAIL. '. json_encode($responseData), 'notify');
-                $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_ERROR);
-
-                return new Response($response->getMessage());
+                $omnipayService->logInfo("PAYMENT FAIL. ERROR: {$response->getMessage()} " . json_encode($responseData), 'notify');
+                $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), Payment::STATUS_ERROR);
+                return $this->createResponse($response->getMessage());
             }
 
         } catch (\Exception $e) {
-            $omnipayService->logInfo('OMNIPAY ERROR: '. $e->getMessage(), 'notify');
+            $omnipayService->logInfo('OMNIPAY ERROR: ' . $e->getMessage(), 'notify');
         }
 
         return new Response('');
@@ -226,29 +222,10 @@ class DefaultController extends Controller
         $omnipayService = $this->get('omnipay');
         $paymentData = $request->getSession()->get('paymentData');
         $paymentId = !empty($paymentData['transactionId'])
-            ? $paymentData['transactionId']
+            ? (int) $paymentData['transactionId']
             : 0;
-        $paymentUserId = !empty($paymentData['userId'])
-            ? $paymentData['userId']
-            : 0;
-
-        /** @var Payment $payment */
-        $payment = $this->getRepository()->findOneBy([
-            'id' => $paymentId,
-            'userId' => $paymentUserId,
-            'status' => Payment::STATUS_CREATED
-        ]);
-
-        if (!$payment) {
-            $omnipayService->logInfo("Payment ID ({$paymentId}) not found.", 'cancel');
-            throw $this->createNotFoundException('Payment not found.');
-        }
 
         $this->logRequestData($request, $paymentId, 'cancel');
-
-        if ($paymentId) {
-            $this->paymentUpdateStatus($paymentId, Payment::STATUS_CANCELED);
-        }
 
         return $this->redirect($omnipayService->getConfigUrl('fail'));
     }
@@ -280,19 +257,19 @@ class DefaultController extends Controller
 
     /**
      * Get payment object
-     * @param $paymentId
-     * @param $userId
+     * @param int $paymentId
+     * @param string $customerEmail
      * @param null $statusName
      * @return object
      */
-    public function getPayment($paymentId, $userId, $statusName = null)
+    public function getPayment($paymentId, $customerEmail, $statusName = null)
     {
         if (!$statusName) {
             $statusName = Payment::STATUS_CREATED;
         }
         return $this->getRepository()->findOneBy([
             'id' => $paymentId,
-            'userId' => $userId,
+            'email' => $customerEmail,
             'status' => $statusName
         ]);
     }
@@ -310,18 +287,17 @@ class DefaultController extends Controller
     }
 
     /**
-     * @param $paymentId
-     * @param $statusName
+     * @param int $paymentId
+     * @param string $customerEmail
+     * @param string $statusName
      */
-    public function paymentUpdateStatus($paymentId, $statusName)
+    public function paymentUpdateStatus($paymentId, $customerEmail, $statusName)
     {
-        /** @var User $user */
-        $user = $this->getUser();
         /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
         $dm = $this->get('doctrine_mongodb')->getManager();
 
         /** @var Payment $payment */
-        $payment = $this->getPayment($paymentId, $user->getId());
+        $payment = $this->getPayment($paymentId, $customerEmail);
         if (!$payment) {
             return;
         }
@@ -347,6 +323,21 @@ class DefaultController extends Controller
             $message . json_encode(array_merge($postData, $getData)),
             $source
         );
+    }
+
+    /**
+     * @param $content
+     * @return Response
+     */
+    public function createResponse($content)
+    {
+        $response = new Response($content);
+        if (strpos($content, '<?xml') === 0) {
+            $response->headers->set('Content-Type', 'application/xml');
+        } else {
+            $response->headers->set('Content-Type', 'text/html');
+        }
+        return $response;
     }
 
     /**
