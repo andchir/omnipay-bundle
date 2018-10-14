@@ -121,6 +121,8 @@ class DefaultController extends Controller
             $omnipayService->logInfo('Order not found. ', 'return');
             $this->logRequestData($request, 0, 'return');
             return new Response('');
+        } else if ($payment->getStatus() !== Payment::STATUS_CREATED) {
+            return new Response('');
         }
 
         $gatewayName = $payment->getOptionValue('gatewayName');
@@ -160,7 +162,7 @@ class DefaultController extends Controller
     /**
      * @Route("/omnipay_notify", name="omnipay_notify")
      * @param Request $request
-     * @return Response
+     * @return Response|RedirectResponse
      */
     public function notifyAction(Request $request)
     {
@@ -169,6 +171,18 @@ class DefaultController extends Controller
 
         /** @var Payment $payment */
         $payment = $omnipayService->getPaymentByRequest($request);
+        if (!$payment) {
+            $paymentData = $request->getSession()->get('paymentData');
+            $paymentId = !empty($paymentData['transactionId'])
+                ? (int) $paymentData['transactionId']
+                : 0;
+            $paymentEmail = !empty($paymentData['email'])
+                ? $paymentData['email']
+                : '';
+            $payment = $this->getPayment($paymentId, $paymentEmail);
+        } else if ($payment->getStatus() !== Payment::STATUS_CREATED) {
+            $payment = null;
+        }
         if (!$payment || !$this->getOrder($payment)) {
             $omnipayService->logInfo('Order not found. ', 'return');
             $this->logRequestData($request, 0, 'return');
@@ -193,7 +207,12 @@ class DefaultController extends Controller
             if ($response->isSuccessful()){
                 $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), Payment::STATUS_COMPLETED);
                 $this->setOrderPaid($payment);
-                return $this->createResponse($response->getMessage());
+
+                $message = $response->getMessage();
+                if (!$message) {
+                    return new RedirectResponse($omnipayService->getConfigUrl('success'));
+                }
+                return $this->createResponse($message);
             }
             if ($response->isRedirect()) {
                 $response->redirect();
@@ -201,7 +220,12 @@ class DefaultController extends Controller
             if (!$response->isSuccessful()){
                 $omnipayService->logInfo("PAYMENT FAIL. ERROR: {$response->getMessage()} " . json_encode($responseData), 'notify');
                 $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), Payment::STATUS_ERROR);
-                return $this->createResponse($response->getMessage());
+
+                $message = $response->getMessage();
+                if (!$message) {
+                    return new RedirectResponse($omnipayService->getConfigUrl('fail'));
+                }
+                return $this->createResponse($message);
             }
 
         } catch (\Exception $e) {
@@ -282,7 +306,8 @@ class DefaultController extends Controller
     {
         return $this->getOrderRepository()->findOneBy([
             'id' => $payment->getOrderId(),
-            'userId' => $payment->getUserId()
+            'userId' => $payment->getUserId(),
+            'email' => $payment->getEmail()
         ]);
     }
 

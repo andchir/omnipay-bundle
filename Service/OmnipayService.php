@@ -80,6 +80,7 @@ class OmnipayService
             'PAYMENT_ID' => $payment->getId(),
             'ORDER_ID' => $payment->getOrderId(),
             'RETURN_URL' => $this->getConfigUrl('return'),
+            'NOTIFY_URL' => $this->getConfigUrl('notify'),
             'CANCEL_URL' => $this->getConfigUrl('cancel'),
             'SUCCESS_URL' => $this->getConfigUrl('success'),
             'FAIL_URL' => $this->getConfigUrl('fail'),
