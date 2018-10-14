@@ -187,23 +187,29 @@ class DefaultController extends Controller
 
         $this->logRequestData($request, $payment->getId(), 'notify');
 
-        $response = $omnipayService->getGateway()->completePurchase($orderData)->send();
-        $responseData = $response->getData();
+        try {
 
-        if (!$response->isSuccessful()){
-            $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_COMPLETED);
-            $this->setOrderPaid($payment);
+            $response = $omnipayService->getGateway()->completePurchase($orderData)->send();
+            $responseData = $response->getData();
 
-            return new Response($response->getMessage());
-        }
-        if ($response->isRedirect()) {
-            $response->redirect();
-        }
-        if (!$response->isSuccessful()){
-            $omnipayService->logInfo('PAYMENT FAIL. '. json_encode($responseData), 'notify');
-            $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_ERROR);
+            if (!$response->isSuccessful()){
+                $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_COMPLETED);
+                $this->setOrderPaid($payment);
 
-            return new Response($response->getMessage());
+                return new Response($response->getMessage());
+            }
+            if ($response->isRedirect()) {
+                $response->redirect();
+            }
+            if (!$response->isSuccessful()){
+                $omnipayService->logInfo('PAYMENT FAIL. '. json_encode($responseData), 'notify');
+                $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_ERROR);
+
+                return new Response($response->getMessage());
+            }
+
+        } catch (\Exception $e) {
+            $omnipayService->logInfo('OMNIPAY ERROR: '. $e->getMessage(), 'notify');
         }
 
         return new Response('');
