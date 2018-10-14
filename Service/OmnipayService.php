@@ -52,6 +52,15 @@ class OmnipayService
     }
 
     /**
+     * @param Payment $payment
+     */
+    public function initialize(Payment $payment)
+    {
+        $parameters = $this->getGatewayConfigParameters($payment);
+        $this->gateway->initialize($parameters);
+    }
+
+    /**
      * @return AbstractGateway
      */
     public function getGateway()
@@ -64,7 +73,7 @@ class OmnipayService
      * @param string $configKey
      * @return array
      */
-    public function getGatewayConfigParameters(Payment $payment, $configKey = 'gateways')
+    public function getGatewayConfigParameters(Payment $payment, $configKey = 'parameters')
     {
         $opts = [
             'CUSTOMER_EMAIL' => $payment->getEmail(),
@@ -74,18 +83,24 @@ class OmnipayService
             'CANCEL_URL' => $this->getConfigUrl('cancel'),
             'SUCCESS_URL' => $this->getConfigUrl('success'),
             'FAIL_URL' => $this->getConfigUrl('fail'),
-            'AMOUNT' => $this->toDecimal($payment->getAmount()),
+            'AMOUNT' => self::toDecimal($payment->getAmount()),
             'CURRENCY' => $payment->getCurrency(),
             'CUSTOMER_IP_ADDR' => $this->getClientIp()
         ];
 
         $gatewayName = $this->gateway->getShortName();
-        $parameters = isset($this->config[$configKey][$gatewayName])
-            ? $this->config[$configKey][$gatewayName]
+        $parameters = isset($this->config['gateways'][$gatewayName][$configKey])
+            ? $this->config['gateways'][$gatewayName][$configKey]
             : [];
+
+        $request = Request::createFromGlobals();
+        $postData = $request->request->all();
 
         foreach($parameters as $paramName => &$value){
             $value = str_replace(array_keys($opts), array_values($opts), $value);
+            if (is_null($value) && isset($postData[$paramName])) {
+                $value = $postData[$paramName];
+            }
         }
 
         return $parameters;
@@ -103,7 +118,7 @@ class OmnipayService
 
         foreach($parameters as $paramName => $value){
             $methodName = 'set' . $paramName;
-            if (!empty($value) && method_exists($this->gateway, $methodName)) {//case-insensitive
+            if (!empty($value) && method_exists($this->gateway, $methodName)) {
                 call_user_func(array($this->gateway, $methodName), $value);
             }
         }
@@ -200,26 +215,13 @@ class OmnipayService
     }
 
     /**
-     * @param $paymentId
-     * @param $description
-     * @param $options
+     * @param Payment $payment
      * @return \Omnipay\Common\Message\RequestInterface
      */
-    public function createPurchase($paymentId, $description, $options)
+    public function createPurchase(Payment $payment)
     {
-        $purchase = $this->gateway->purchase($options);
-        $purchase->setTransactionId($paymentId);
-        $purchase->setDescription($description);
-        if ($this->getConfigOption('returnUrl')) {
-            $purchase->setReturnUrl($this->getConfigOption('returnUrl'));
-        }
-        if ($this->getConfigOption('cancelUrl')) {
-            $purchase->setCancelUrl($this->getConfigOption('cancelUrl'));
-        }
-        if ($this->getConfigOption('notifyUrl')) {
-            $purchase->setNotifyUrl($this->getConfigOption('notifyUrl'));
-        }
-        return $purchase;
+        $parameters = $this->getGatewayConfigParameters($payment, 'purchase');
+        return $this->gateway->purchase($parameters);
     }
 
     /**
@@ -228,16 +230,7 @@ class OmnipayService
      */
     public function sendPurchase(Payment $payment)
     {
-        $this->setGatewayParameters($payment);
-
-        $purchase = $this->createPurchase(
-            $payment->getId(),
-            $payment->getDescription(),
-            [
-                'amount' => OmnipayService::toDecimal($payment->getAmount()),
-                'currency' => $payment->getCurrency()
-            ]
-        );
+        $purchase = $this->createPurchase($payment);
         $response = $purchase->send();
 
         // Save data in session
@@ -271,51 +264,37 @@ class OmnipayService
 
     public function getPaymentByRequest(Request $request)
     {
-        $requestData = array_merge($request->query->all(), $request->request->all());
-        $paymentId = 0;
-        $customerEmail = '';
-        $gateways_complete_parameters = $this->config['gateways_complete'];
-        foreach ($gateways_complete_parameters as $parameters) {
-            // Search payment ID
-            $paymentIdKeys = array_filter($parameters, function($v){
-                return $v === 'PAYMENT_ID';
-            });
-            if (!empty($paymentIdKeys)) {
-                $keys = array_keys($paymentIdKeys);
-                $tmpArr = array_filter($requestData, function($v, $k) use ($keys) {
-                    return in_array($k, $keys) && !empty($v);
-                }, ARRAY_FILTER_USE_BOTH);
-                if (!empty($tmpArr)) {
-                    $tmpArr = array_values($tmpArr);
-                    $paymentId = (int) current($tmpArr);
-                    break;
-                }
-            }
-            // Search customer email
-            $emailKeys = array_filter($parameters, function($v){
-                return $v === 'CUSTOMER_EMAIL';
-            });
-            if (!empty($emailKeys)) {
-                $keys = array_keys($emailKeys);
-                $tmpArr = array_filter($requestData, function($v, $k) use ($keys) {
-                    return in_array($k, $keys) && !empty($v);
-                }, ARRAY_FILTER_USE_BOTH);
-                if (!empty($tmpArr)) {
-                    $tmpArr = array_values($tmpArr);
-                    $customerEmail = current($tmpArr);
-                    break;
-                }
-            }
-        }
-
         /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
         $dm = $this->container->get('doctrine_mongodb')->getManager();
         /** @var PaymentRepository $paymentRepository */
         $paymentRepository = $dm->getRepository(Payment::class);
 
+        $requestData = array_merge($request->query->all(), $request->request->all());
+
+        // Search payment ID
+        $paymentId = 0;
+        $paymentIdKeys = $this->config['data_keys']['paymentId'];
+        $tmpArr = array_filter($requestData, function($v, $k) use ($paymentIdKeys) {
+            return in_array($k, $paymentIdKeys) && !empty($v);
+        }, ARRAY_FILTER_USE_BOTH);
+        if (!empty($tmpArr)) {
+            $tmpArr = array_values($tmpArr);
+            $paymentId = (int) current($tmpArr);
+        }
         if (!empty($paymentId)) {
             $payments = $paymentRepository->findLastById($paymentId);
             return !empty($payments) ? $payments->getSingleResult() : null;
+        }
+
+        // Search customer email
+        $customerEmail = '';
+        $emailKeys = $this->config['data_keys']['customerEmail'];
+        $tmpArr = array_filter($requestData, function($v, $k) use ($emailKeys) {
+            return in_array($k, $emailKeys) && !empty($v);
+        }, ARRAY_FILTER_USE_BOTH);
+        if (!empty($tmpArr)) {
+            $tmpArr = array_values($tmpArr);
+            $customerEmail = current($tmpArr);
         }
         if (!empty($customerEmail)) {
             $payments = $paymentRepository->findLastByEmail($customerEmail);

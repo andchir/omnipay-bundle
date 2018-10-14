@@ -68,6 +68,8 @@ class DefaultController extends Controller
         $dm->persist($payment);
         $dm->flush();
 
+        $omnipayService->initialize($payment);
+
         //if ($omnipayService->getGatewaySupportsAuthorize()) {
         if ($gatewayName === 'Sberbank') {
 
@@ -129,7 +131,7 @@ class DefaultController extends Controller
 
         $this->logRequestData($request, $payment->getId(), 'return');
 
-        $orderData = $omnipayService->getGatewayConfigParameters($payment, 'gateways_complete');
+        $orderData = $omnipayService->getGatewayConfigParameters($payment, 'complete');
 
         try {
 
@@ -138,8 +140,7 @@ class DefaultController extends Controller
 
             if ($response->isSuccessful()){
 
-                $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_COMPLETED);
-                $this->setOrderPaid($payment);
+                return new Response($response->getMessage());
 
             } elseif ($response->isRedirect()) {
                 $omnipayService->logInfo('PAYMENT REDIRECT. '. json_encode($responseData), 'return');
@@ -147,6 +148,8 @@ class DefaultController extends Controller
             } else {
                 $omnipayService->logInfo('PAYMENT FAIL. '. json_encode($responseData), 'return');
                 $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_ERROR);
+
+                return new Response($response->getMessage());
             }
 
         } catch (\Exception $e) {
@@ -163,48 +166,44 @@ class DefaultController extends Controller
      */
     public function notifyAction(Request $request)
     {
-        $paymentData = $request->getSession()->get('paymentData');
-        $paymentId = !empty($paymentData['transactionId'])
-            ? $paymentData['transactionId']
-            : 0;
-        $paymentUserId = !empty($paymentData['userId'])
-            ? $paymentData['userId']
-            : 0;
-        $gatewayName = !empty($paymentData['gatewayName'])
-            ? $paymentData['gatewayName']
-            : 0;
-
         /** @var OmnipayService $omnipayService */
         $omnipayService = $this->get('omnipay');
-        if (!$gatewayName || !$omnipayService->create($gatewayName)) {
-            $omnipayService->logInfo("Payment gateway ({$gatewayName}) not found.", 'return');
-            //throw $this->createNotFoundException('Payment gateway not found.');
-            return new Response('');
-        };
 
         /** @var Payment $payment */
-        $payment = $this->getPayment($paymentId, $paymentUserId);
+        $payment = $omnipayService->getPaymentByRequest($request);
         if (!$payment || !$this->getOrder($payment)) {
-            $omnipayService->logInfo(
-                "Order for payment ID {$paymentId} not found. ". json_encode($paymentData),
-                'notify'
-            );
+            $omnipayService->logInfo('Order not found. ', 'return');
+            $this->logRequestData($request, 0, 'return');
             return new Response('');
         }
 
-        $orderData = $omnipayService->getGatewayConfigParameters($payment, 'gateways_complete');
+        $gatewayName = $payment->getOptionValue('gatewayName');
+        if (!$gatewayName || !$omnipayService->create($gatewayName)) {
+            $omnipayService->logInfo("Payment gateway ({$gatewayName}) not found.", 'notify');
+            return new Response('');
+        };
 
-        $this->logRequestData($request, $paymentId, 'notify');
+        $orderData = $omnipayService->getGatewayConfigParameters($payment, 'complete');
+
+        $this->logRequestData($request, $payment->getId(), 'notify');
 
         $response = $omnipayService->getGateway()->completePurchase($orderData)->send();
         $responseData = $response->getData();
 
+        if (!$response->isSuccessful()){
+            $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_COMPLETED);
+            $this->setOrderPaid($payment);
+
+            return new Response($response->getMessage());
+        }
         if ($response->isRedirect()) {
             $response->redirect();
         }
-        else if (!$response->isSuccessful()){
+        if (!$response->isSuccessful()){
             $omnipayService->logInfo('PAYMENT FAIL. '. json_encode($responseData), 'notify');
-            $this->paymentUpdateStatus($paymentId, Payment::STATUS_ERROR);
+            $this->paymentUpdateStatus($payment->getId(), Payment::STATUS_ERROR);
+
+            return new Response($response->getMessage());
         }
 
         return new Response('');
