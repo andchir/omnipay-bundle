@@ -263,12 +263,7 @@ class OmnipayService
         $this->logInfo(json_encode($paymentData) . " Order ID: {$payment->getId()}", 'start');
 
         // Process response
-        if ($response->isSuccessful()) {
-
-            // Payment was successful
-            // print_r($response);
-
-        } elseif ($response->isRedirect()) {
+        if ($response->isRedirect()) {
             $response->redirect();
         } else {
             // Payment failed
@@ -278,6 +273,10 @@ class OmnipayService
         return true;
     }
 
+    /**
+     * @param Request $request
+     * @return Payment|null
+     */
     public function getPaymentByRequest(Request $request)
     {
         /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
