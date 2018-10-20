@@ -2,11 +2,11 @@
 
 namespace Andchir\OmnipayBundle\Service;
 
-use AppBundle\Repository\PaymentRepository;
+use App\Repository\PaymentRepository;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session;
-use AppBundle\Document\Payment;
+use App\MainBundle\Document\Payment;
 use Omnipay\Common\AbstractGateway;
 use Omnipay\Omnipay as OmnipayCore;
 use Omnipay\Omnipay;

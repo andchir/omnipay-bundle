@@ -4,12 +4,6 @@ namespace Andchir\OmnipayBundle\Controller;
 
 use Omnipay\Common\Message\AbstractResponse;
 use Omnipay\Common\Message\AbstractRequest;
-use Andchir\OmnipayBundle\Service\OmnipayService;
-use AppBundle\Controller\Admin\OrderController;
-use AppBundle\Document\Payment;
-use AppBundle\Document\Setting;
-use AppBundle\Document\User;
-use AppBundle\Service\SettingsService;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
@@ -19,7 +13,13 @@ use Symfony\Component\HttpFoundation\Response;
 use Sensio\Bundle\FrameworkExtraBundle\Configuration\ParamConverter;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use AppBundle\Document\Order;
+use Andchir\OmnipayBundle\Service\OmnipayService;
+use App\Controller\Admin\OrderController;
+use App\Service\SettingsService;
+use App\MainBundle\Document\Payment;
+use App\MainBundle\Document\Setting;
+use App\MainBundle\Document\User;
+use App\MainBundle\Document\Order;
 
 class DefaultController extends Controller
 {
