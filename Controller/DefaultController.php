@@ -261,7 +261,7 @@ class DefaultController extends Controller
      */
     public function setOrderPaid(Payment $payment)
     {
-        $paymentStatusAfterNumber = (int) $this->getParameter('payment_status_after_number');
+        $paymentStatusAfterNumber = (int) $this->getParameter('app.payment_status_after_number');
         /** @var SettingsService $settingsService */
         $settingsService = $this->container->get('app.settings');
         /** @var Setting $statusSetting */
