@@ -5,8 +5,7 @@ namespace Andchir\OmnipayBundle\Controller;
 use Omnipay\Common\Message\AbstractResponse;
 use Omnipay\Common\Message\AbstractRequest;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Route;
-use Sensio\Bundle\FrameworkExtraBundle\Configuration\Method;
+use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -36,7 +35,7 @@ class DefaultController extends Controller
         /** @var User $user */
         $user = $this->getUser();
         $userId = $user ? $user->getId() : 0;
-        /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
+        /** @var \Doctrine\Common\Persistence\ObjectManager $dm */
         $dm = $this->get('doctrine_mongodb')->getManager();
         if ($order->getUserId() !== $userId || $order->getIsPaid()) {
             throw $this->createAccessDeniedException();
@@ -318,7 +317,7 @@ class DefaultController extends Controller
      */
     public function paymentUpdateStatus($paymentId, $customerEmail, $statusName)
     {
-        /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
+        /** @var \Doctrine\Common\Persistence\ObjectManager $dm */
         $dm = $this->get('doctrine_mongodb')->getManager();
 
         /** @var Payment $payment */
@@ -366,7 +365,7 @@ class DefaultController extends Controller
     }
 
     /**
-     * @return \AppBundle\Repository\OrderRepository
+     * @return \App\Repository\OrderRepository
      */
     public function getOrderRepository()
     {
@@ -376,7 +375,7 @@ class DefaultController extends Controller
     }
 
     /**
-     * @return \AppBundle\Repository\PaymentRepository
+     * @return \App\Repository\PaymentRepository
      */
     public function getRepository()
     {
