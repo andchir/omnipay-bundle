@@ -1,5 +1,6 @@
 {
     "name": "andchir/omnipay-bundle",
+    "type": "symfony-bundle",
     "description": "Omnipay bundle for Symfony 3.x",
     "keywords": ["symfony", "bundle", "omnipay", "payment", "shopkeeper"],
     "license": "MIT",
