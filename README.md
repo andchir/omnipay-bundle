@@ -16,7 +16,7 @@ omnipay:
     data_keys:
         paymentId: ['orderNumber']
         customerEmail: ['customerNumber']
-    gateways: ~
+    gateways: 
         PayPal_Express:
             parameters:
                 username: xxxxxxxxxxxxx
