@@ -49,7 +49,6 @@ class DefaultController extends Controller
             throw $this->createNotFoundException('Payment gateway not found.');
         };
 
-        $currency = 'RUB';
         $paymentDescription = 'Order #' . $order->getId();
 
         // Create payment
@@ -58,7 +57,7 @@ class DefaultController extends Controller
             ->setUserId($userId)
             ->setEmail($order->getEmail())
             ->setOrderId($order->getId())
-            ->setCurrency($currency)
+            ->setCurrency($order->getCurrency())
             ->setAmount($order->getPrice())
             ->setDescription($paymentDescription)
             ->setStatus(Payment::STATUS_CREATED)
