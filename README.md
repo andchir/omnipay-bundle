@@ -85,6 +85,22 @@ omnipay:
             complete:
                 username: ~
                 password: ~
+        RoboKassa:
+            parameters:
+                purse: xxxxxx
+                secretKey: xxxxxx
+                secretKey2: xxxxxx
+            purchase:
+                purse: ~
+                secretKey: ~
+                amount: AMOUNT
+                currency: RUB
+                description: ~
+                testMode: true
+            complete:
+                purse: ~
+                secretKey: ~
+                secretKey2: ~
 ~~~
 
 Example of use:
