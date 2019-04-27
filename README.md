@@ -96,6 +96,9 @@ omnipay:
                 amount: AMOUNT
                 currency: RUB
                 description: ~
+                receipt: ~
+                InvId: PAYMENT_ID
+                client: CUSTOMER_EMAIL
                 testMode: true
             complete:
                 purse: ~
