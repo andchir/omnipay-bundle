@@ -164,6 +164,8 @@ class DefaultController extends Controller
      */
     public function notifyAction(Request $request)
     {
+        $this->logRequestData($request, 0, 'notify');
+
         /** @var OmnipayService $omnipayService */
         $omnipayService = $this->get('omnipay');
 
@@ -182,8 +184,8 @@ class DefaultController extends Controller
             $payment = null;
         }
         if (!$payment || !$this->getOrder($payment)) {
-            $omnipayService->logInfo('Order not found. ', 'return');
-            $this->logRequestData($request, 0, 'return');
+            $omnipayService->logInfo('Order not found. ', 'notify');
+            $this->logRequestData($request, 0, 'notify');
             return new Response('');
         }
 
