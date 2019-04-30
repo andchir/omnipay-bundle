@@ -130,7 +130,7 @@ class OmnipayService
     {
         $parameters = $this->getGatewayConfigParameters($payment);
 
-        $this->logInfo(json_encode($parameters), 'parameters');
+        $this->logInfo(json_encode($parameters, JSON_UNESCAPED_UNICODE), 'parameters');
 
         foreach($parameters as $paramName => $value){
             $methodName = 'set' . $paramName;
@@ -247,7 +247,8 @@ class OmnipayService
     public function sendPurchase(Payment $payment)
     {
         $purchase = $this->createPurchase($payment);
-        $this->logInfo("Purchase data: " . json_encode($purchase->getData()), 'start');
+        $this->logInfo("Purchase data: " . json_encode($purchase->getData(), JSON_UNESCAPED_UNICODE), 'start');
+        $this->logInfo("Purchase data: " . print_r($purchase->getData(), true), 'start');
         $response = $purchase->send();
 
         // Save data in session
@@ -261,7 +262,7 @@ class OmnipayService
         ];
         $this->session->set('paymentData', $paymentData);
 
-        $this->logInfo(json_encode($paymentData) . " Order ID: {$payment->getId()}", 'start');
+        $this->logInfo(json_encode($paymentData, JSON_UNESCAPED_UNICODE) . " Order ID: {$payment->getId()}", 'start');
 
         // Process response
         if ($response->isRedirect()) {
