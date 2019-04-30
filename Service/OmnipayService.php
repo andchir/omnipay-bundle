@@ -247,6 +247,7 @@ class OmnipayService
     public function sendPurchase(Payment $payment)
     {
         $purchase = $this->createPurchase($payment);
+        $this->logInfo("Purchase data: " . json_encode($purchase->getData()), 'start');
         $response = $purchase->send();
 
         // Save data in session
