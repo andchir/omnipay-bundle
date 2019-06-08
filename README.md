@@ -134,3 +134,5 @@ $omnipayService->initialize($payment);
 
 $omnipayService->sendPurchase($payment);
 ~~~
+
+Developed for [https://github.com/andchir/shopkeeper4](https://github.com/andchir/shopkeeper4)
