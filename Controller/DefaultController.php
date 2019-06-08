@@ -2,6 +2,9 @@
 
 namespace Andchir\OmnipayBundle\Controller;
 
+use Andchir\OmnipayBundle\Document\PaymentInterface;
+use Andchir\OmnipayBundle\Repository\OrderRepositoryInterface;
+use Andchir\OmnipayBundle\Repository\PaymentRepositoryInterface;
 use Omnipay\Common\Message\AbstractResponse;
 use Omnipay\Common\Message\AbstractRequest;
 use Symfony\Bundle\FrameworkBundle\Controller\Controller;
@@ -60,7 +63,7 @@ class DefaultController extends Controller
             ->setCurrency($order->getCurrency())
             ->setAmount($order->getPrice())
             ->setDescription($paymentDescription)
-            ->setStatus(Payment::STATUS_CREATED)
+            ->setStatus(PaymentInterface::STATUS_CREATED)
             ->setOptions(['gatewayName' => $gatewayName]);
 
         $dm->persist($payment);
@@ -113,13 +116,13 @@ class DefaultController extends Controller
         /** @var OmnipayService $omnipayService */
         $omnipayService = $this->get('omnipay');
 
-        /** @var Payment $payment */
+        /** @var PaymentInterface $payment */
         $payment = $omnipayService->getPaymentByRequest($request);
         if (!$payment || !$this->getOrder($payment)) {
             $omnipayService->logInfo('Order not found. ', 'return');
             $this->logRequestData($request, 0, 'return');
             return new Response('');
-        } else if ($payment->getStatus() !== Payment::STATUS_CREATED) {
+        } else if ($payment->getStatus() !== PaymentInterface::STATUS_CREATED) {
             return new Response('');
         }
 
@@ -146,7 +149,7 @@ class DefaultController extends Controller
                 $response->redirect();
             } else {
                 $omnipayService->logInfo("PAYMENT FAIL. MESSAGE: {$response->getMessage()}" . json_encode($responseData), 'return');
-                $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), Payment::STATUS_ERROR);
+                $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), PaymentInterface::STATUS_ERROR);
                 return $this->createResponse($response->getMessage());
             }
 
@@ -169,7 +172,7 @@ class DefaultController extends Controller
         /** @var OmnipayService $omnipayService */
         $omnipayService = $this->get('omnipay');
 
-        /** @var Payment $payment */
+        /** @var PaymentInterface $payment */
         $payment = $omnipayService->getPaymentByRequest($request);
         if (!$payment) {
             $paymentData = $request->getSession()->get('paymentData');
@@ -180,7 +183,7 @@ class DefaultController extends Controller
                 ? $paymentData['email']
                 : '';
             $payment = $this->getPayment($paymentId, $paymentEmail);
-        } else if ($payment->getStatus() !== Payment::STATUS_CREATED) {
+        } else if ($payment->getStatus() !== PaymentInterface::STATUS_CREATED) {
             $payment = null;
         }
         if (!$payment || !$this->getOrder($payment)) {
@@ -205,7 +208,7 @@ class DefaultController extends Controller
             $responseData = $response->getData();
 
             if ($response->isSuccessful()){
-                $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), Payment::STATUS_COMPLETED);
+                $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), PaymentInterface::STATUS_COMPLETED);
                 $this->setOrderPaid($payment);
 
                 $message = $response->getMessage();
@@ -219,7 +222,7 @@ class DefaultController extends Controller
             }
             if (!$response->isSuccessful()){
                 $omnipayService->logInfo("PAYMENT FAIL. ERROR: {$response->getMessage()} " . json_encode($responseData), 'notify');
-                $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), Payment::STATUS_ERROR);
+                $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), PaymentInterface::STATUS_ERROR);
 
                 $message = $response->getMessage();
                 if (!$message) {
@@ -257,10 +260,10 @@ class DefaultController extends Controller
     /**
      * Update order status in Shopkeeper app
      * Update order status
-     * @param Payment $payment
+     * @param PaymentInterface $payment
      * @return bool
      */
-    public function setOrderPaid(Payment $payment)
+    public function setOrderPaid(PaymentInterface $payment)
     {
         $paymentStatusAfterNumber = (int) $this->getParameter('app.payment_status_after_number');
         /** @var SettingsService $settingsService */
@@ -289,7 +292,7 @@ class DefaultController extends Controller
     public function getPayment($paymentId, $customerEmail, $statusName = null)
     {
         if (!$statusName) {
-            $statusName = Payment::STATUS_CREATED;
+            $statusName = PaymentInterface::STATUS_CREATED;
         }
         return $this->getRepository()->findOneBy([
             'id' => $paymentId,
@@ -299,10 +302,10 @@ class DefaultController extends Controller
     }
 
     /**
-     * @param Payment $payment
+     * @param PaymentInterface $payment
      * @return object
      */
-    public function getOrder(Payment $payment)
+    public function getOrder(PaymentInterface $payment)
     {
         return $this->getOrderRepository()->findOneBy([
             'id' => $payment->getOrderId(),
@@ -321,7 +324,7 @@ class DefaultController extends Controller
         /** @var \Doctrine\Common\Persistence\ObjectManager $dm */
         $dm = $this->get('doctrine_mongodb')->getManager();
 
-        /** @var Payment $payment */
+        /** @var PaymentInterface $payment */
         $payment = $this->getPayment($paymentId, $customerEmail);
         if (!$payment) {
             return;
@@ -366,22 +369,22 @@ class DefaultController extends Controller
     }
 
     /**
-     * @return \App\Repository\OrderRepository
+     * @return OrderRepositoryInterface
      */
     public function getOrderRepository()
     {
         return $this->get('doctrine_mongodb')
             ->getManager()
-            ->getRepository(Order::class);
+            ->getRepository('AppMainBundle:Order');
     }
 
     /**
-     * @return \App\Repository\PaymentRepository
+     * @return PaymentRepositoryInterface
      */
     public function getRepository()
     {
         return $this->get('doctrine_mongodb')
             ->getManager()
-            ->getRepository(Payment::class);
+            ->getRepository('AppMainBundle:Payment');
     }
 }

@@ -2,11 +2,12 @@
 
 namespace Andchir\OmnipayBundle\Service;
 
-use App\Repository\PaymentRepository;
+use Andchir\OmnipayBundle\Document\PaymentInterface;
+use Andchir\OmnipayBundle\Repository\PaymentRepositoryInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Session\Session;
-use App\MainBundle\Document\Payment;
+use Doctrine\ODM\MongoDB\DocumentRepository;
 use Omnipay\Common\AbstractGateway;
 use Omnipay\Omnipay as OmnipayCore;
 use Omnipay\Omnipay;
@@ -52,9 +53,9 @@ class OmnipayService
     }
 
     /**
-     * @param Payment $payment
+     * @param PaymentInterface $payment
      */
-    public function initialize(Payment $payment)
+    public function initialize(PaymentInterface $payment)
     {
         $parameters = $this->getGatewayConfigParameters($payment);
         $this->gateway->initialize($parameters);
@@ -69,11 +70,11 @@ class OmnipayService
     }
 
     /**
-     * @param Payment $payment
+     * @param PaymentInterface $payment
      * @param string $configKey
      * @return array
      */
-    public function getGatewayConfigParameters(Payment $payment, $configKey = 'parameters')
+    public function getGatewayConfigParameters(PaymentInterface $payment, $configKey = 'parameters')
     {
         $opts = [
             'CUSTOMER_EMAIL' => $payment->getEmail(),
@@ -123,10 +124,10 @@ class OmnipayService
     }
 
     /**
-     * @param Payment $payment
+     * @param PaymentInterface $payment
      * Set gateway parameters
      */
-    public function setGatewayParameters(Payment $payment)
+    public function setGatewayParameters(PaymentInterface $payment)
     {
         $parameters = $this->getGatewayConfigParameters($payment);
 
@@ -231,20 +232,20 @@ class OmnipayService
     }
 
     /**
-     * @param Payment $payment
+     * @param PaymentInterface $payment
      * @return \Omnipay\Common\Message\RequestInterface
      */
-    public function createPurchase(Payment $payment)
+    public function createPurchase(PaymentInterface $payment)
     {
         $parameters = $this->getGatewayConfigParameters($payment, 'purchase');
         return $this->gateway->purchase($parameters);
     }
 
     /**
-     * @param Payment $payment
+     * @param PaymentInterface $payment
      * @return bool
      */
-    public function sendPurchase(Payment $payment)
+    public function sendPurchase(PaymentInterface $payment)
     {
         $purchase = $this->createPurchase($payment);
         $this->logInfo("Purchase data: " . json_encode($purchase->getData(), JSON_UNESCAPED_UNICODE), 'start');
@@ -277,14 +278,14 @@ class OmnipayService
 
     /**
      * @param Request $request
-     * @return Payment|null
+     * @return PaymentInterface|null
      */
     public function getPaymentByRequest(Request $request)
     {
         /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
         $dm = $this->container->get('doctrine_mongodb')->getManager();
-        /** @var PaymentRepository $paymentRepository */
-        $paymentRepository = $dm->getRepository(Payment::class);
+        /** @var PaymentRepositoryInterface $paymentRepository */
+        $paymentRepository = $dm->getRepository('AppMainBundle:Payment');
 
         $requestData = array_merge($request->query->all(), $request->request->all());
 
