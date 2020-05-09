@@ -5,6 +5,11 @@ Install:
 composer require andchir/omnipay-bundle
 ~~~
 
+Sberbank:
+~~~
+composer require andrewnovikof/omnipay-sberbank
+~~~
+
 Configuration:
 ~~~
 omnipay:
