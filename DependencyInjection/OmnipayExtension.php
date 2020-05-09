@@ -27,5 +27,7 @@ class OmnipayExtension extends Extension
 
         $definition = $container->getDefinition('omnipay');
         $definition->addArgument($config);
+
+        $container->setParameter('omnipay_config', $config);// Add config to parameters
     }
 }

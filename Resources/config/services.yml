@@ -1,4 +1,17 @@
 services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    Andchir\OmnipayBundle\:
+        resource: '../../*'
+        exclude: '{Resource}'
+
+    Andchir\OmnipayBundle\Controller\:
+        resource: '../../Controller'
+        tags: ['controller.service_arguments']
+    
     omnipay:
         class: Andchir\OmnipayBundle\Service\OmnipayService
         arguments: ['@service_container', '@logger', '@session']

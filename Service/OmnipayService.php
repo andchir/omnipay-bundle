@@ -4,14 +4,14 @@ namespace Andchir\OmnipayBundle\Service;
 
 use Andchir\OmnipayBundle\Document\PaymentInterface;
 use Andchir\OmnipayBundle\Repository\PaymentRepositoryInterface;
+use App\MainBundle\Document\Payment;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Session\Session;
-use Doctrine\ODM\MongoDB\DocumentRepository;
 use Omnipay\Common\AbstractGateway;
 use Omnipay\Omnipay as OmnipayCore;
 use Omnipay\Omnipay;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
 
 class OmnipayService
 {
@@ -23,20 +23,25 @@ class OmnipayService
     protected $config;
     /** @var LoggerInterface */
     private $logger;
-    /** @var Session */
+    /** @var SessionInterface */
     private $session;
 
     public function __construct(
         ContainerInterface $container,
         LoggerInterface $logger,
-        Session $session,
+        SessionInterface $session,
         array $config = []
     )
     {
         $this->container = $container;
-        $this->config = $config;
         $this->logger = $logger;
         $this->session = $session;
+        
+        if (empty($config) && $container->hasParameter('omnipay_config')) {
+            $this->config = $container->getParameter('omnipay_config');
+        } else {
+            $this->config = $config;
+        }
     }
 
     /**
@@ -285,7 +290,7 @@ class OmnipayService
         /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
         $dm = $this->container->get('doctrine_mongodb')->getManager();
         /** @var PaymentRepositoryInterface $paymentRepository */
-        $paymentRepository = $dm->getRepository('AppMainBundle:Payment');
+        $paymentRepository = $dm->getRepository(Payment::class);
 
         $requestData = array_merge($request->query->all(), $request->request->all());
 
