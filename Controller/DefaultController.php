@@ -306,7 +306,6 @@ class DefaultController extends AbstractController
             $this->eventDispatcher,
             $this->settingsService
         );
-        $orderController->setContainer($this->container);
         return $orderController->updateItemProperty(
             $payment->getOrderId(),
             'status',
