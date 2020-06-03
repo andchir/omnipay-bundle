@@ -5,6 +5,7 @@ namespace Andchir\OmnipayBundle\Service;
 use Andchir\OmnipayBundle\Document\PaymentInterface;
 use Andchir\OmnipayBundle\Repository\PaymentRepositoryInterface;
 use App\MainBundle\Document\Payment;
+use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Omnipay\Common\AbstractGateway;
 use Omnipay\Omnipay as OmnipayCore;
@@ -283,12 +284,11 @@ class OmnipayService
 
     /**
      * @param Request $request
+     * @param ObjectManager $dm
      * @return PaymentInterface|null
      */
-    public function getPaymentByRequest(Request $request)
+    public function getPaymentByRequest(Request $request, ObjectManager $dm)
     {
-        /** @var \Doctrine\ODM\MongoDB\DocumentManager $dm */
-        $dm = $this->container->get('doctrine_mongodb')->getManager();
         /** @var PaymentRepositoryInterface $paymentRepository */
         $paymentRepository = $dm->getRepository(Payment::class);
 

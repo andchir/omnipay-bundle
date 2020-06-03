@@ -147,7 +147,7 @@ class DefaultController extends AbstractController
     public function returnAction(Request $request)
     {
         /** @var PaymentInterface $payment */
-        $payment = $this->omnipayService->getPaymentByRequest($request);
+        $payment = $this->omnipayService->getPaymentByRequest($request, $this->dm);
         if (!$payment || !$this->getOrder($payment)) {
             $this->omnipayService->logInfo('Order not found. ', 'return');
             $this->logRequestData($request, 0, 'return');
@@ -200,7 +200,7 @@ class DefaultController extends AbstractController
         $this->logRequestData($request, 0, 'notify');
 
         /** @var PaymentInterface $payment */
-        $payment = $this->omnipayService->getPaymentByRequest($request);
+        $payment = $this->omnipayService->getPaymentByRequest($request, $this->dm);
         if (!$payment) {
             $paymentData = $request->getSession()->get('paymentData');
             $paymentId = !empty($paymentData['transactionId'])
