@@ -197,7 +197,7 @@ class DefaultController extends AbstractController
      */
     public function notifyAction(Request $request)
     {
-        $this->logRequestData($request, 0, 'notify');
+        $this->logRequestData($request, 0, 'notify');// LOGGING
 
         /** @var PaymentInterface $payment */
         $payment = $this->omnipayService->getPaymentByRequest($request, $this->dm);
@@ -215,7 +215,7 @@ class DefaultController extends AbstractController
         }
         if (!$payment || !$this->getOrder($payment)) {
             $this->omnipayService->logInfo('Order not found. ', 'notify');
-            $this->logRequestData($request, 0, 'notify');
+            $this->logRequestData($request, 0, 'notify');// LOGGING
             return new Response('');
         }
 
@@ -227,7 +227,7 @@ class DefaultController extends AbstractController
 
         $orderData = $this->omnipayService->getGatewayConfigParameters($payment, 'complete');
 
-        $this->logRequestData($request, $payment->getId(), 'notify');
+        $this->logRequestData($request, $payment->getId(), 'notify');// LOGGING
 
         try {
 
@@ -235,6 +235,7 @@ class DefaultController extends AbstractController
             $responseData = $response->getData();
 
             if ($response->isSuccessful()){
+                $this->logRequestData($request, $payment->getId(), 'success');// LOGGING
                 $this->paymentUpdateStatus($payment->getId(), $payment->getEmail(), PaymentInterface::STATUS_COMPLETED);
                 $this->setOrderPaid($payment);
 
@@ -245,6 +246,7 @@ class DefaultController extends AbstractController
                 return $this->createResponse($message);
             }
             if ($response->isRedirect()) {
+                $this->logRequestData($request, $payment->getId(), 'redirect');// LOGGING
                 $response->redirect();
             }
             if (!$response->isSuccessful()){
