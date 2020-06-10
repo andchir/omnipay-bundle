@@ -107,10 +107,10 @@ class DefaultController extends AbstractController
         //if ($this->omnipayService->getGatewaySupportsAuthorize()) {
         if ($gatewayName === 'Sberbank') {
 
-            $parameters = $this->omnipayService->getConfigOption('parameters');
+            $parameters = $this->omnipayService->getGatewayConfigParameters($payment, 'purchase');
             $purchaseData = [
                 'orderNumber' => $payment->getId(),
-                'amount' => $payment->getAmount() * 100, // The amount of payment in kopecks (or cents)
+                'amount' => $payment->getAmount(),
                 'returnUrl' => $this->omnipayService->getConfigUrl('success'),
                 'description' => $paymentDescription
             ];
@@ -118,6 +118,7 @@ class DefaultController extends AbstractController
 
             /** @var AbstractRequest $authRequest */
             $authRequest = $this->omnipayService->getGateway()
+                ->setTestMode((boolean) $parameters['testMode'])
                 ->authorize($purchaseData)
                 ->setUserName($parameters['username'])
                 ->setPassword($parameters['password']);
