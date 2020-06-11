@@ -117,12 +117,14 @@ class OmnipayService
             }
             if (is_null($value) && isset($start_parameters[$paramName])) {
                 $value = $start_parameters[$paramName];
+                continue;
             }
             if (is_null($value) && isset($postData[$paramName])) {
                 $value = $postData[$paramName];
+                continue;
             }
             if (is_null($value)) {
-                $value = '';
+                $value = $request->get($paramName, '');
             }
         }
 
@@ -194,15 +196,16 @@ class OmnipayService
     }
 
     /**
-     * @param $optionName
+     * @param string $optionName
+     * @param string|int|bool $default
      * @return string
      */
-    public function getConfigOption($optionName)
+    public function getConfigOption($optionName, $default = '')
     {
         $gatewayName = $this->gateway->getShortName();
         return isset($this->config['gateways'][$gatewayName][$optionName])
             ? $this->config['gateways'][$gatewayName][$optionName]
-            : '';
+            : $default;
     }
 
     /**
@@ -222,11 +225,22 @@ class OmnipayService
     }
 
     /**
-     * @return boolean
+     * @return bool
      */
     public function getGatewaySupportsAuthorize()
     {
         return $this->gateway->supportsAuthorize();
+    }
+
+    /**
+     * @return bool
+     */
+    public function getIsPrefersAuthorize()
+    {
+        if (!$this->getConfigOption('prefersAuthorize')) {
+            return false;
+        }
+        return $this->getGatewaySupportsAuthorize();
     }
 
     /**
@@ -258,16 +272,7 @@ class OmnipayService
         $this->logInfo("Purchase data: " . print_r($purchase->getData(), true), 'start');
         $response = $purchase->send();
 
-        // Save data in session
-        $paymentData = [
-            'transactionId' => $payment->getId(),
-            'email' => $payment->getEmail(),
-            'userId' => $payment->getUserId(),
-            'amount' => $payment->getAmount(),
-            'currency' => $payment->getCurrency(),
-            'gatewayName' => $this->getGatewayName()
-        ];
-        $this->session->set('paymentData', $paymentData);
+        $paymentData = $this->savePaymentDataSession($payment);
 
         $this->logInfo(json_encode($paymentData, JSON_UNESCAPED_UNICODE) . " Order ID: {$payment->getId()}", 'start');
 
@@ -280,6 +285,48 @@ class OmnipayService
             return false;
         }
         return true;
+    }
+
+    /**
+     * @param PaymentInterface $payment
+     * @param string $paymentDescription
+     * @return string
+     */
+    public function authorizeRequest(PaymentInterface $payment, $paymentDescription = '')
+    {
+        $output = '';
+        $parameters = $this->getGatewayConfigParameters($payment, 'purchase');
+        $purchaseData = [
+            'orderNumber' => $payment->getId(),
+            'amount' => $payment->getAmount(),
+            'returnUrl' => $this->getConfigUrl('notify'),
+            'failUrl' => $this->getConfigUrl('fail'),
+            'description' => $paymentDescription
+        ];
+        $this->logInfo("Purchase data: " . json_encode($purchaseData, JSON_UNESCAPED_UNICODE), 'start');
+
+        $this->savePaymentDataSession($payment);
+
+        /** @var AbstractRequest $authRequest */
+        $authRequest = $this->getGateway()
+            ->setTestMode((boolean) $parameters['testMode'])
+            ->authorize($purchaseData)
+            ->setUserName($parameters['username'])
+            ->setPassword($parameters['password']);
+
+        /** @var AbstractResponse $response */
+        $response = $authRequest->send();
+
+        if (!$response->isSuccessful()) {
+            $this->logInfo('PAYMENT SUCCESS. ' . $response->getMessage(), 'start');
+            $output = $response->getMessage();
+        }
+
+        if ($response->isRedirect()) {
+            $this->logInfo('PAYMENT REDIRECT. ' . json_encode($response->getData()), 'start');
+            $response->redirect();
+        }
+        return $output;
     }
 
     /**
@@ -325,6 +372,24 @@ class OmnipayService
         }
 
         return null;
+    }
+
+    /**
+     * @param PaymentInterface $payment
+     * @return array
+     */
+    public function savePaymentDataSession(PaymentInterface $payment)
+    {
+        $paymentData = [
+            'transactionId' => $payment->getId(),
+            'email' => $payment->getEmail(),
+            'userId' => $payment->getUserId(),
+            'amount' => $payment->getAmount(),
+            'currency' => $payment->getCurrency(),
+            'gatewayName' => $this->getGatewayName()
+        ];
+        $this->session->set('paymentData', $paymentData);
+        return $paymentData;
     }
 
     /**

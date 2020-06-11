@@ -104,40 +104,10 @@ class DefaultController extends AbstractController
 
         $this->omnipayService->initialize($payment);
 
-        //if ($this->omnipayService->getGatewaySupportsAuthorize()) {
-        if ($gatewayName === 'Sberbank') {
-
-            $parameters = $this->omnipayService->getGatewayConfigParameters($payment, 'purchase');
-            $purchaseData = [
-                'orderNumber' => $payment->getId(),
-                'amount' => $payment->getAmount(),
-                'returnUrl' => $this->omnipayService->getConfigUrl('success'),
-                'description' => $paymentDescription
-            ];
-            $this->omnipayService->logInfo("Purchase data: " . json_encode($purchaseData, JSON_UNESCAPED_UNICODE), 'start');
-
-            /** @var AbstractRequest $authRequest */
-            $authRequest = $this->omnipayService->getGateway()
-                ->setTestMode((boolean) $parameters['testMode'])
-                ->authorize($purchaseData)
-                ->setUserName($parameters['username'])
-                ->setPassword($parameters['password']);
-
-            /** @var AbstractResponse $response */
-            $response = $authRequest->send();
-
-            if (!$response->isSuccessful()) {
-                $output = $response->getMessage();
-            }
-
-            if ($response->isRedirect()) {
-                $response->redirect();
-            }
-
+        if ($this->omnipayService->getIsPrefersAuthorize()) {
+            $output = $this->omnipayService->authorizeRequest($payment, $paymentDescription);
         } else {
-
             $this->omnipayService->sendPurchase($payment);
-
         }
 
         return new Response($output);
@@ -234,7 +204,6 @@ class DefaultController extends AbstractController
         $this->logRequestData($request, $payment->getId(), 'notify');// LOGGING
 
         try {
-
             $response = $this->omnipayService->getGateway()->completePurchase($orderData)->send();
             $responseData = $response->getData();
 

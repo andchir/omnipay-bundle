@@ -5,11 +5,6 @@ Install:
 composer require andchir/omnipay-bundle
 ~~~
 
-Sberbank:
-~~~
-composer require andrewnovikof/omnipay-sberbank
-~~~
-
 Configuration:
 ~~~
 omnipay:
@@ -19,9 +14,9 @@ omnipay:
     notify_url: '/omnipay_notify'
     cancel_url: '/omnipay_cancel'
     data_keys:
-        paymentId: ['orderNumber', 'InvId']
+        paymentId: ['orderNumber', 'Shp_TransactionId']
         customerEmail: ['customerNumber', 'Email', 'Shp_Client']
-    gateways: 
+    gateways:
         PayPal_Express:
             parameters:
                 username: xxxxxxxxxxxxx
@@ -58,7 +53,7 @@ omnipay:
                 cancelUrl: CANCEL_URL
             purchase:
                 amount: AMOUNT
-                currency: CURRENCY
+                currency: RUB
                 receipt: ~
                 testMode: true
             complete:
@@ -70,14 +65,14 @@ omnipay:
                 orderSumAmount: AMOUNT
                 orderSumCurrencyPaycash: ~
                 orderSumBankPaycash: ~
-                shopid: ~
                 invoiceId: ~
                 customerNumber: CUSTOMER_EMAIL
                 password: ~
         Sberbank:
+            prefersAuthorize: true
             parameters:
-                username: xxxxxx
-                password: xxxxxx
+                username: xxxxxxxxx
+                password: xxxxxxxxx
                 returnUrl: RETURN_URL
                 cancelUrl: CANCEL_URL
             purchase:
@@ -85,11 +80,12 @@ omnipay:
                 password: ~
                 orderNumber: PAYMENT_ID
                 amount: AMOUNT
-                currency: CURRENCY
+                currency: RUB
                 testMode: true
             complete:
                 username: ~
                 password: ~
+                orderId: ~
         RoboKassa:
             parameters:
                 purse: xxxxxx
@@ -103,13 +99,14 @@ omnipay:
                 currencyLabel: ~
                 description: ~
                 receipt: ~
-                InvId: PAYMENT_ID
+                transactionId: PAYMENT_ID
                 client: CUSTOMER_EMAIL
                 testMode: true
             complete:
                 purse: ~
                 secretKey: ~
                 secretKey2: ~
+
 ~~~
 
 Example of use:
@@ -140,4 +137,4 @@ $omnipayService->initialize($payment);
 $omnipayService->sendPurchase($payment);
 ~~~
 
-Developed for [https://github.com/andchir/shopkeeper4](https://github.com/andchir/shopkeeper4)
+Developed for [https://shopker.org/](https://shopker.org/)
