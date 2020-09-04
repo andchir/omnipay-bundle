@@ -2,7 +2,7 @@
 
 namespace Andchir\OmnipayBundle\Repository;
 
-use Doctrine\Common\Persistence\ObjectRepository;
+use Doctrine\Persistence\ObjectRepository;
 
 interface PaymentRepositoryInterface extends ObjectRepository {
 
